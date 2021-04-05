@@ -1,4 +1,9 @@
 <resources>
     <string name="app_name">选择题判题</string>
     <string name="civil_servants_exam">公务员考试</string>
+    <string name="camera_button_name">拍照</string>
+    <string name="gallery_button_name">从相册选择</string>
+    <string name="cancel_button_name">取消</string>
+    <string name="result_text_name">成绩</string>
+    <string name="ok_button_name">确认</string>
 </resources>
