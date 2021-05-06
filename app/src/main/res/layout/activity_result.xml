@@ -12,7 +12,10 @@
         android:layout_width="match_parent"
         android:layout_height="50dp"
         android:layout_weight="1"
-        android:text="@string/result_text_name" />
+        android:text="@string/result_text_name"
+        android:gravity="center"
+
+        android:textSize="30sp" />
 
     <ListView
         android:id="@+id/list_grade"

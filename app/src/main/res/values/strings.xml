@@ -6,4 +6,5 @@
     <string name="cancel_button_name">取消</string>
     <string name="result_text_name">成绩</string>
     <string name="ok_button_name">确认</string>
+    <string name="standard_name">标准答案设置</string>
 </resources>
