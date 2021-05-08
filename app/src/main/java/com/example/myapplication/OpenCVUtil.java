@@ -55,8 +55,6 @@ public class OpenCVUtil {
     public HashMap<Integer, Integer> getAns(String path, Context context){
 //        extStorageDirectory = context.getExternalFilesDir("/temp").getAbsolutePath();
 
-        System.out.println(path);
-
 
         FileInputStream fs = null;
         try {
@@ -65,9 +63,7 @@ public class OpenCVUtil {
             e.printStackTrace();
         }
         Bitmap bitmap  = BitmapFactory.decodeStream(fs);
-        if(bitmap == null){
-            System.out.println("bitmap是·空的");
-        }
+
         // 读取图片
         Mat src = new Mat();
         Utils.bitmapToMat(bitmap,src);
@@ -77,12 +73,6 @@ public class OpenCVUtil {
 //        Imgcodecs.imwrite(extStorageDirectory + File.separator + "src.jpg", src);
 
         // 转为灰度图像
-
-        System.out.println(src.channels());
-        System.out.println(src.size());
-        if(src.empty())
-            System.out.println("为空");
-
         Mat gray = new Mat();
         if(src.channels() != 1)
             Imgproc.cvtColor(src, gray, Imgproc.COLOR_BGR2GRAY);

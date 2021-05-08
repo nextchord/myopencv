@@ -1,6 +1,7 @@
 package com.example.myapplication;
 
 import androidx.annotation.Nullable;
+import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
@@ -8,8 +9,10 @@ import androidx.core.content.FileProvider;
 import androidx.core.os.EnvironmentCompat;
 
 import android.Manifest;
+import android.content.ContentResolver;
 import android.content.ContentUris;
 import android.content.ContentValues;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
@@ -244,6 +247,7 @@ public class PictureActivity extends AppCompatActivity {
         return tempFile;
     }
 
+    @RequiresApi(api = Build.VERSION_CODES.KITKAT)
     @Override
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
@@ -260,16 +264,25 @@ public class PictureActivity extends AppCompatActivity {
 //                }
                 //将拍照后，文件的路径传给下一个Activity
 //                intent.putExtra("mPicPath",mCameraImagePath);
-                String[] dataStr = mCameraImagePath.split("/");
+
+                String originPath = "";
+                if(isAndroidQ){
+                    originPath = getPathFromUri(getApplicationContext(), mCameraUri);
+                }
+                else{
+                    originPath = mCameraImagePath;
+                }
+
+                String[] dataStr = originPath.split("/");
                 String fileTruePath = "/sdcard";
                 for(int i=4;i<dataStr.length;i++){
                     fileTruePath = fileTruePath+"/"+dataStr[i];
                 }
-
+                //System.out.println(fileTruePath);
                 OpenCVUtil openCVUtil = new OpenCVUtil();
                 Map<Integer, Integer> ans;
                 ans = openCVUtil.getAns(fileTruePath, PictureActivity.this);
-                if(ans == null || ans.size() != 27){
+                if(ans == null){
                     Toast.makeText(getApplicationContext(), "图片有误", Toast.LENGTH_SHORT).show();
                     return;
                 }
@@ -330,16 +343,17 @@ public class PictureActivity extends AppCompatActivity {
                     //4.4以下的系统使用的图片处理方法
                     path = handleImageBeforeKitKat(data);
                 }
+
                 String[] dataStr = path.split("/");
                 String fileTruePath = "/sdcard";
                 for(int i=4;i<dataStr.length;i++){
                     fileTruePath = fileTruePath+"/"+dataStr[i];
                 }
-
+                //System.out.println(fileTruePath);
                 OpenCVUtil openCVUtil = new OpenCVUtil();
                 Map<Integer, Integer> ans;
                 ans = openCVUtil.getAns(fileTruePath, PictureActivity.this);
-                if(ans == null || ans.size() != 27){
+                if(ans == null){
                     Toast.makeText(getApplicationContext(), "图片有误", Toast.LENGTH_SHORT).show();
                     return;
                 }
@@ -471,4 +485,98 @@ public class PictureActivity extends AppCompatActivity {
         return path;
     }
 
+    //Uri转换成图片路径
+    @RequiresApi(api = Build.VERSION_CODES.KITKAT)
+    public String getPathFromUri(Context context, Uri uri) {
+        String path = null;
+        if (DocumentsContract.isDocumentUri(context, uri)) {
+            //如果是document类型的Uri，通过document id处理，内部会调用Uri.decode(docId)进行解码
+            String docId = DocumentsContract.getDocumentId(uri);
+            //primary:Azbtrace.txt
+            //video:A1283522
+            String[] splits = docId.split(":");
+            String type = null, id = null;
+            if(splits.length == 2) {
+                type = splits[0];
+                id = splits[1];
+            }
+            switch (uri.getAuthority()) {
+                case "com.android.externalstorage.documents":
+                    if("primary".equals(type)) {
+                        path = Environment.getExternalStorageDirectory() + File.separator + id;
+                    }
+                    break;
+                case "com.android.providers.downloads.documents":
+                    if("raw".equals(type)) {
+                        path = id;
+                    } else {
+                        Uri contentUri = ContentUris.withAppendedId(Uri.parse("content://downloads/public_downloads"), Long.valueOf(docId));
+                        path = getMediaPathFromUri(context, contentUri, null, null);
+                    }
+                    break;
+                case "com.android.providers.media.documents":
+                    Uri externalUri = null;
+                    switch (type) {
+                        case "image":
+                            externalUri = MediaStore.Images.Media.EXTERNAL_CONTENT_URI;
+                            break;
+                        case "video":
+                            externalUri = MediaStore.Video.Media.EXTERNAL_CONTENT_URI;
+                            break;
+                        case "audio":
+                            externalUri = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI;
+                            break;
+                    }
+                    if(externalUri != null) {
+                        String selection = "_id=?";
+                        String[] selectionArgs = new String[]{ id };
+                        path = getMediaPathFromUri(context, externalUri, selection, selectionArgs);
+                    }
+                    break;
+            }
+        } else if (ContentResolver.SCHEME_CONTENT.equalsIgnoreCase(uri.getScheme())) {
+            path = getMediaPathFromUri(context, uri, null, null);
+        } else if (ContentResolver.SCHEME_FILE.equalsIgnoreCase(uri.getScheme())) {
+            //如果是file类型的Uri(uri.fromFile)，直接获取图片路径即可
+            path = uri.getPath();
+        }
+        //确保如果返回路径，则路径合法
+        return path == null ? null : (new File(path).exists() ? path : null);
+    }
+
+    private static String getMediaPathFromUri(Context context, Uri uri, String selection, String[] selectionArgs) {
+        String path;
+        String authroity = uri.getAuthority();
+        path = uri.getPath();
+        String sdPath = Environment.getExternalStorageDirectory().getAbsolutePath();
+        if(!path.startsWith(sdPath)) {
+            int sepIndex = path.indexOf(File.separator, 1);
+            if(sepIndex == -1) path = null;
+            else {
+                //path = sdpath + ...
+                path = "sdcard" + path.substring(sepIndex);
+            }
+        }
+
+        if(path == null || !new File(path).exists()) {
+            ContentResolver resolver = context.getContentResolver();
+            String[] projection = new String[]{ MediaStore.MediaColumns.DATA };
+            Cursor cursor = resolver.query(uri, projection, selection, selectionArgs, null);
+            if (cursor != null) {
+                if (cursor.moveToFirst()) {
+                    try {
+                        int index = cursor.getColumnIndexOrThrow(projection[0]);
+                        if (index != -1) path = cursor.getString(index);
+                        //Log.i(TAG, "getMediaPathFromUri query " + path);
+                    } catch (IllegalArgumentException e) {
+                        e.printStackTrace();
+                        path = null;
+                    } finally {
+                        cursor.close();
+                    }
+                }
+            }
+        }
+        return path;
+    }
 }
